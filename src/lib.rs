@@ -12,7 +12,8 @@ pub struct String {
 }
 
 impl String {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             ptr: NonNull::dangling(),
             len: 0,
@@ -20,6 +21,10 @@ impl String {
         }
     }
 
+    /// # Panics
+    ///
+    /// Will panic if layout fails to be built
+    #[must_use]
     pub fn new_with_capacity(capacity: usize) -> Self {
         if capacity == 0 {
             return Self::new();
@@ -34,26 +39,6 @@ impl String {
             len: 0,
             capacity,
         }
-    }
-
-    fn grow(&mut self) {
-        let new_capacity = if self.capacity == 0 {
-            8
-        } else {
-            self.capacity * 2
-        };
-        let new_layout = Layout::array::<u8>(new_capacity).expect("Invalid capacity");
-
-        let new_raw_ptr = if self.capacity == 0 {
-            unsafe { alloc(new_layout) }
-        } else {
-            let old_layout = Layout::array::<u8>(self.capacity).expect("Invalid capacity");
-            unsafe { realloc(self.ptr.as_ptr(), old_layout, new_capacity) }
-        };
-
-        self.ptr =
-            NonNull::new(new_raw_ptr).unwrap_or_else(|| std::alloc::handle_alloc_error(new_layout));
-        self.capacity = new_capacity;
     }
 
     fn grow_to(&mut self, new_capacity: usize) {
@@ -82,19 +67,22 @@ impl String {
         self.grow_to(new_capacity);
     }
 
-    pub fn len(&self) -> usize {
+    #[must_use]
+    pub const fn len(&self) -> usize {
         self.len
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    pub fn capacity(&self) -> usize {
+    #[must_use]
+    pub const fn capacity(&self) -> usize {
         self.capacity
     }
 
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         if self.capacity == 0 {
             return;
         }
@@ -106,6 +94,9 @@ impl String {
         self.len = 0;
     }
 
+    /// # Panics
+    ///
+    /// Will panic if layout fails to be built
     pub fn erase(&mut self) {
         if self.capacity != 0 {
             let layout = Layout::array::<u8>(self.capacity).expect("Invalid capacity");
@@ -119,15 +110,17 @@ impl String {
         self.capacity = 0;
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
     }
 
-    pub fn as_str(&self) -> &str {
+    #[must_use]
+    pub const fn as_str(&self) -> &str {
         unsafe { std::str::from_utf8_unchecked(self.as_bytes()) }
     }
 
-    pub fn push(&mut self, byte: u8) {
+    pub const fn push(&mut self, byte: u8) {
         unsafe {
             self.ptr.as_ptr().add(self.len).write(byte);
         }
@@ -152,6 +145,9 @@ impl String {
         self.len += bytes.len();
     }
 
+    /// # Panics
+    ///
+    /// Will panic if layout fails to be built
     pub fn shrink_to_fit(&mut self) {
         if self.len == self.capacity {
             return;
@@ -208,7 +204,7 @@ impl From<&str> for String {
 
 impl Clone for String {
     fn clone(&self) -> Self {
-        let mut clone = String::new_with_capacity(self.capacity);
+        let mut clone = Self::new_with_capacity(self.capacity);
         clone.push_str(self.as_str());
 
         clone
